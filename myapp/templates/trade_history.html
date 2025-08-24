@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Trade History{% endblock %}
+{% block content %}
+<div class="bg-white p-4 rounded shadow">
+  <h3 class="font-semibold mb-4">All Trades</h3>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="text-left p-2">Time</th>
+          <th class="text-left p-2">Pair</th>
+          <th class="text-left p-2">Side</th>
+          <th class="text-left p-2">Amount</th>
+          <th class="text-left p-2">Price</th>
+          <th class="text-left p-2">Notional</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trades %}
+          <tr class="border-t">
+            <td class="p-2">{{ t.timestamp }}</td>
+            <td class="p-2">{{ t.currency_pair.base_currency }}/{{ t.currency_pair.quote_currency }}</td>
+            <td class="p-2">{{ t.side }}</td>
+            <td class="p-2">{{ t.amount }}</td>
+            <td class="p-2">{{ t.price }}</td>
+            <td class="p-2">{{ t.total_value }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="p-2" colspan="6">No trades yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

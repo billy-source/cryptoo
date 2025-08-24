@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-6 rounded shadow">
+  <h2 class="text-2xl font-bold mb-4">Login</h2>
+  <form method="POST" class="space-y-3">
+    {% csrf_token %}
+    <input name="username" placeholder="Username" class="w-full border p-2 rounded" />
+    <input type="password" name="password" placeholder="Password" class="w-full border p-2 rounded" />
+    <button class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
+  </form>
+  <p class="text-sm mt-3">No account?
+    <a class="text-blue-600" href="{% url 'signup' %}">Sign up</a>
+  </p>
+</div>
+{% endblock %}

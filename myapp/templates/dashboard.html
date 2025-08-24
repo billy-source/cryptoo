@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="flex justify-between items-center mb-4">
+  <h2 class="text-2xl font-bold">Dashboard</h2>
+  <a href="{% url 'dashboard' %}?refresh=1" class="bg-gray-800 text-white px-3 py-1 rounded">Refresh Prices</a>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="space-y-4 md:col-span-1">
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-semibold mb-2">Account</h3>
+      <p>Cash: <span class="font-bold">${{ cash }}</span></p>
+      <p>Crypto Value: <span class="font-bold">${{ portfolio_value }}</span></p>
+      <p>Total Equity: <span class="font-bold">${{ total_equity }}</span></p>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-semibold mb-2">Holdings</h3>
+      <ul class="space-y-1">
+        {% for h in holdings %}
+          <li class="flex justify-between"><span>{{ h.currency_pair.base_currency }}</span><span>{{ h.quantity }} (=${{ h.market_value }})</span></li>
+        {% empty %}
+          <li>No holdings yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="bg-white p-4 rounded shadow md:col-span-2">
+    <h3 class="font-semibold mb-4">Place Order</h3>
+    <form method="POST" class="grid md:grid-cols-3 gap-4">
+      {% csrf_token %}
+      <div>{{ form.currency_pair.label_tag }} {{ form.currency_pair }}</div>
+      <div>{{ form.side.label_tag }} {{ form.side }}</div>
+      <div>{{ form.amount.label_tag }} {{ form.amount }}</div>
+      <div class="md:col-span-3">
+        <button class="bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="bg-white p-4 rounded shadow mt-6">
+  <div class="flex justify-between items-center">
+    <h3 class="font-semibold">Market (Current Rates)</h3>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-100">
+        <tr><th class="text-left p-2">Pair</th><th class="text-left p-2">Price</th></tr>
+      </thead>
+      <tbody>
+        {% for c in currencies %}
+        <tr class="border-t">
+          <td class="p-2">{{ c.base_currency }}/{{ c.quote_currency }}</td>
+          <td class="p-2">{{ c.current_rate }}</td>
+        </tr>
+        {% empty %}
+        <tr><td class="p-2" colspan="2">No currencies yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="bg-white p-4 rounded shadow mt-6">
+  <h3 class="font-semibold mb-3">BTC/USD – Last Prices</h3>
+  <canvas id="priceChart" height="100"></canvas>
+</div>
+
+<div class="bg-white p-4 rounded shadow mt-6">
+  <div class="flex justify-between items-center">
+    <h3 class="font-semibold">Recent Trades</h3>
+    <a class="text-blue-600" href="{% url 'trade_history' %}">View all</a>
+  </div>
+  <ul class="divide-y">
+    {% for t in trades %}
+      <li class="py-2 flex justify-between">
+        <span>{{ t.side }} {{ t.amount }} {{ t.currency_pair.base_currency }} @ {{ t.price }}</span>
+        <span class="text-gray-500">{{ t.timestamp }}</span>
+      </li>
+    {% empty %}
+      <li class="py-2">No trades yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+fetch("{% url 'price_history_api' 'BTC' %}")
+  .then(r => r.json())
+  .then(data => {
+    const ctx = document.getElementById('priceChart');
+    const labels = data.timestamps.map(t => new Date(t).toLocaleTimeString());
+    const prices = data.prices.map(Number);
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ label: data.symbol + '/USD', data: prices, borderWidth: 2 }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: false } }
+      }
+    });
+  });
+</script>
+{% endblock %}
