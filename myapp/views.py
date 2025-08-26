@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 
-from .models import Currency, Holding, Trade, PriceHistory
+from .models import Currency, Holding, Trade, PriceHistory, Profile   # 👈 added Profile
 from .forms import TradeForm
 from .tasks import fetch_and_update_prices
 
@@ -29,7 +29,13 @@ def signup_view(request):
         if User.objects.filter(username=username).exists():
             messages.error(request, "Username already taken.")
             return redirect("signup")
+
+        # ✅ create user
         user = User.objects.create_user(username=username, email=email, password=password)
+
+        # ✅ ensure profile exists with $10,000 starting balance
+        Profile.objects.get_or_create(user=user, defaults={"balance": Decimal("10000.00")})
+
         login(request, user)
         return redirect("dashboard")
     return render(request, "signup.html")
@@ -53,7 +59,6 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    
     if request.GET.get("refresh") == "1":
         try:
             fetch_and_update_prices()
@@ -63,9 +68,12 @@ def dashboard(request):
 
     currencies = Currency.objects.all().order_by("base_currency")
     holdings = Holding.objects.filter(user=request.user).select_related("currency_pair")
-    recent_trades = Trade.objects.filter(user=request.user)[:10]
+    recent_trades = Trade.objects.filter(user=request.user).order_by("-timestamp")[:10]
 
-    cash = request.user.profile.balance
+    # ✅ always guarantee profile exists with balance
+    profile, _ = Profile.objects.get_or_create(user=request.user, defaults={"balance": Decimal("10000.00")})
+    cash = profile.balance
+
     portfolio_value = sum(h.market_value for h in holdings)
     total_equity = cash + portfolio_value
 
@@ -98,7 +106,7 @@ def dashboard(request):
 
 @login_required
 def trade_history(request):
-    trades = Trade.objects.filter(user=request.user).select_related("currency_pair")
+    trades = Trade.objects.filter(user=request.user).select_related("currency_pair").order_by("-timestamp")
     return render(request, "trade_history.html", {"trades": trades})
 
 

@@ -1,35 +1,65 @@
-{% extends "base.html" %}
-{% block title %}Trade History{% endblock %}
-{% block content %}
-<div class="bg-white p-4 rounded shadow">
-  <h3 class="font-semibold mb-4">All Trades</h3>
-  <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="text-left p-2">Time</th>
-          <th class="text-left p-2">Pair</th>
-          <th class="text-left p-2">Side</th>
-          <th class="text-left p-2">Amount</th>
-          <th class="text-left p-2">Price</th>
-          <th class="text-left p-2">Notional</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in trades %}
-          <tr class="border-t">
-            <td class="p-2">{{ t.timestamp }}</td>
-            <td class="p-2">{{ t.currency_pair.base_currency }}/{{ t.currency_pair.quote_currency }}</td>
-            <td class="p-2">{{ t.side }}</td>
-            <td class="p-2">{{ t.amount }}</td>
-            <td class="p-2">{{ t.price }}</td>
-            <td class="p-2">{{ t.total_value }}</td>
-          </tr>
-        {% empty %}
-          <tr><td class="p-2" colspan="6">No trades yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endblock %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trade History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+    <!-- Navbar -->
+    <nav class="bg-gray-800 p-4 text-white flex justify-between">
+        <h1 class="text-xl font-bold">Trade History</h1>
+        <div>
+            <a href="{% url 'dashboard' %}" class="px-4">Dashboard</a>
+            <a href="{% url 'logout' %}" class="px-4">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        <!-- Heading -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-6">
+            <h2 class="text-2xl font-bold">📊 Your Trade History</h2>
+            <p class="text-gray-600">All your buy & sell transactions are listed below.</p>
+        </div>
+
+        <!-- Trade Table -->
+        <div class="bg-white p-6 rounded-xl shadow-md overflow-x-auto">
+            {% if trades %}
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 text-left">
+                            <th class="p-3 border-b">Date</th>
+                            <th class="p-3 border-b">Coin</th>
+                            <th class="p-3 border-b">Type</th>
+                            <th class="p-3 border-b">Amount (USD)</th>
+                            <th class="p-3 border-b">Price (USD)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trade in trades %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-3 border-b">{{ trade.date|date:"M d, Y H:i" }}</td>
+                                <td class="p-3 border-b font-semibold">
+                                    {% if trade.symbol == "bitcoin" %}BTC{% elif trade.symbol == "ethereum" %}ETH{% else %}{{ trade.symbol }}{% endif %}
+                                </td>
+                                <td class="p-3 border-b">
+                                    {% if trade.action == "buy" %}
+                                        <span class="text-green-600 font-bold">BUY</span>
+                                    {% else %}
+                                        <span class="text-red-600 font-bold">SELL</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 border-b">${{ trade.amount|floatformat:2 }}</td>
+                                <td class="p-3 border-b">${{ trade.price|floatformat:2 }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-gray-600">No trades yet. Go to the <a href="{% url 'dashboard' %}" class="text-blue-600 underline">Dashboard</a> to start trading.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
