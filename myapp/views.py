@@ -35,7 +35,7 @@ def signup_view(request):
         # Create user
         user = User.objects.create_user(username=username, email=email, password=password)
 
-        # Create profile with $10,000
+        # Create profile with $10,000 balance
         Profile.objects.get_or_create(user=user, defaults={"balance": Decimal("10000.00")})
 
         login(request, user)
@@ -90,13 +90,12 @@ def dashboard(request):
             side = form.cleaned_data["side"]
             amount = Decimal(form.cleaned_data["amount"])
 
-            # ✅ Ensure amount > 0
             if amount <= 0:
                 messages.error(request, "Amount must be greater than 0.")
                 return redirect("dashboard")
 
             try:
-                # Use Trade.execute which must handle real balance checks
+                # Call execute in Trade model
                 Trade.execute(request.user, currency, side, amount)
                 messages.success(
                     request,
