@@ -4,11 +4,12 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
- 
+import requests  # ✅ For live prices
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    balance = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("20000.00"))  # $20,000 start
+    balance = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("10000.00"))  # $10,000 start
 
     def __str__(self):
         return f"{self.user.username} Profile - Balance: {self.balance}"
@@ -31,6 +32,21 @@ class Currency(models.Model):
 
     def __str__(self):
         return f"{self.base_currency}/{self.quote_currency}"
+
+    def update_price(self):
+        """Fetch real-time price from CoinGecko API."""
+        try:
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={self.base_currency.lower()}&vs_currencies={self.quote_currency.lower()}"
+            response = requests.get(url).json()
+            new_price = Decimal(str(response[self.base_currency.lower()][self.quote_currency.lower()]))
+            self.current_price = new_price
+            self.save()
+
+            # Save in history
+            PriceHistory.objects.create(currency_pair=self, price=new_price)
+            return new_price
+        except Exception as e:
+            return self.current_price  # fallback if API fails
 
 
 class Holding(models.Model):
@@ -63,7 +79,9 @@ class Trade(models.Model):
     def execute(cls, user, currency, side, amount):
         """Executes a trade (buy/sell) with balance and holding checks."""
         amount = Decimal(amount)
-        price = currency.current_price
+
+        # ✅ Always refresh price before trade
+        price = currency.update_price()
         cost = amount * price
 
         with transaction.atomic():
