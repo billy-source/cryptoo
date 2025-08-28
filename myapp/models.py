@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-import requests 
+import requests
 
 
 class Profile(models.Model):
@@ -13,7 +13,6 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} Profile - Balance: {self.balance}"
-
 
 
 @receiver(post_save, sender=User)
@@ -42,10 +41,9 @@ class Currency(models.Model):
             self.current_price = new_price
             self.save()
 
-            
             PriceHistory.objects.create(currency_pair=self, price=new_price)
             return new_price
-        except Exception as e:
+        except Exception:
             return self.current_price  # fallback if API fails
 
 
@@ -68,7 +66,8 @@ class Trade(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     currency_pair = models.ForeignKey(Currency, on_delete=models.CASCADE)
     side = models.CharField(max_length=4, choices=SIDE_CHOICES)
-    amount = models.DecimalField(max_digits=20, decimal_places=8)
+    amount = models.DecimalField(max_digits=20, decimal_places=8)  # crypto amount (BTC, ETH)
+    usd_value = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))  # new field
     price = models.DecimalField(max_digits=20, decimal_places=8)
     timestamp = models.DateTimeField(default=timezone.now)
 
@@ -76,40 +75,43 @@ class Trade(models.Model):
         return f"{self.user.username} {self.side} {self.amount} {self.currency_pair.base_currency} @ {self.price}"
 
     @classmethod
-    def execute(cls, user, currency, side, amount):
-        """Executes a trade (buy/sell) with balance and holding checks."""
-        amount = Decimal(amount)
-
-       
+    def execute(cls, user, currency, side, usd_amount):
+        """
+        Executes a trade (buy/sell).
+        Users enter USD value they want to trade, not raw crypto amount.
+        """
+        usd_amount = Decimal(usd_amount)
         price = currency.update_price()
-        cost = amount * price
+
+        # Convert USD value to crypto units (e.g. $100 / $60,000 = 0.001666 BTC)
+        crypto_amount = usd_amount / price
 
         with transaction.atomic():
             profile = user.profile
             holding, _ = Holding.objects.get_or_create(user=user, currency_pair=currency)
 
             if side == "BUY":
-                if profile.balance < cost:
+                if profile.balance < usd_amount:
                     raise ValueError("Insufficient balance to buy.")
-                profile.balance -= cost
-                holding.amount += amount
+                profile.balance -= usd_amount
+                holding.amount += crypto_amount
                 profile.save()
                 holding.save()
 
             elif side == "SELL":
-                if holding.amount < amount:
+                if holding.amount < crypto_amount:
                     raise ValueError("Insufficient holdings to sell.")
-                profile.balance += cost
-                holding.amount -= amount
+                profile.balance += usd_amount
+                holding.amount -= crypto_amount
                 profile.save()
                 holding.save()
 
-        
             return cls.objects.create(
                 user=user,
                 currency_pair=currency,
                 side=side,
-                amount=amount,
+                amount=crypto_amount,
+                usd_value=usd_amount,
                 price=price,
             )
 
