@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 
-from .models import Currency, Holding, Trade, PriceHistory, Profile   # 👈 added Profile
+from .models import Currency, Holding, Trade, PriceHistory, Profile
 from .forms import TradeForm
 from .tasks import fetch_and_update_prices
 
@@ -13,12 +13,14 @@ from .tasks import fetch_and_update_prices
 def home_view(request):
     return render(request, "home.html")
 
+
 def signup_view(request):
     if request.method == "POST":
-        username = request.POST.get("username","").strip()
-        email = request.POST.get("email","").strip()
-        password = request.POST.get("password","")
-        confirm = request.POST.get("confirm_password","")
+        username = request.POST.get("username", "").strip()
+        email = request.POST.get("email", "").strip()
+        password = request.POST.get("password", "")
+        confirm = request.POST.get("confirm_password", "")
+
         from django.contrib.auth.models import User
         if not username or not password:
             messages.error(request, "Username and password required.")
@@ -30,20 +32,21 @@ def signup_view(request):
             messages.error(request, "Username already taken.")
             return redirect("signup")
 
-        # ✅ create user
+        # Create user
         user = User.objects.create_user(username=username, email=email, password=password)
 
-        # ✅ ensure profile exists with $10,000 starting balance
+        # Create profile with $10,000
         Profile.objects.get_or_create(user=user, defaults={"balance": Decimal("10000.00")})
 
         login(request, user)
         return redirect("dashboard")
     return render(request, "signup.html")
 
+
 def login_view(request):
     if request.method == "POST":
-        username = request.POST.get("username","")
-        password = request.POST.get("password","")
+        username = request.POST.get("username", "")
+        password = request.POST.get("password", "")
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
@@ -51,6 +54,7 @@ def login_view(request):
         messages.error(request, "Invalid credentials.")
         return redirect("login")
     return render(request, "login.html")
+
 
 def logout_view(request):
     logout(request)
@@ -70,8 +74,10 @@ def dashboard(request):
     holdings = Holding.objects.filter(user=request.user).select_related("currency_pair")
     recent_trades = Trade.objects.filter(user=request.user).order_by("-timestamp")[:10]
 
-    # ✅ always guarantee profile exists with balance
-    profile, _ = Profile.objects.get_or_create(user=request.user, defaults={"balance": Decimal("10000.00")})
+    # Always ensure profile exists
+    profile, _ = Profile.objects.get_or_create(
+        user=request.user, defaults={"balance": Decimal("10000.00")}
+    )
     cash = profile.balance
 
     portfolio_value = sum(h.market_value for h in holdings)
@@ -82,10 +88,20 @@ def dashboard(request):
         if form.is_valid():
             currency = form.cleaned_data["currency_pair"]
             side = form.cleaned_data["side"]
-            amount = form.cleaned_data["amount"]
+            amount = Decimal(form.cleaned_data["amount"])
+
+            # ✅ Ensure amount > 0
+            if amount <= 0:
+                messages.error(request, "Amount must be greater than 0.")
+                return redirect("dashboard")
+
             try:
+                # Use Trade.execute which must handle real balance checks
                 Trade.execute(request.user, currency, side, amount)
-                messages.success(request, f"{side} {amount} {currency.base_currency} executed.")
+                messages.success(
+                    request,
+                    f"{side.upper()} {amount} {currency.base_currency} executed successfully.",
+                )
                 return redirect("dashboard")
             except ValueError as e:
                 messages.error(request, str(e))
@@ -94,15 +110,20 @@ def dashboard(request):
     else:
         form = TradeForm()
 
-    return render(request, "dashboard.html", {
-        "currencies": currencies,
-        "holdings": holdings,
-        "trades": recent_trades,
-        "form": form,
-        "cash": cash,
-        "portfolio_value": portfolio_value,
-        "total_equity": total_equity,
-    })
+    return render(
+        request,
+        "dashboard.html",
+        {
+            "currencies": currencies,
+            "holdings": holdings,
+            "trades": recent_trades,
+            "form": form,
+            "cash": cash,
+            "portfolio_value": portfolio_value,
+            "total_equity": total_equity,
+        },
+    )
+
 
 @login_required
 def trade_history(request):
@@ -113,12 +134,14 @@ def trade_history(request):
 def price_history_api(request, symbol):
     symbol = symbol.upper()
     pair = get_object_or_404(Currency, base_currency=symbol, quote_currency="USD")
-    rows = PriceHistory.objects.filter(currency_pair=pair).order_by("timestamp").values("timestamp","price")[:500]
-    return JsonResponse({
-        "symbol": symbol,
-        "timestamps": [r["timestamp"].isoformat() for r in rows],
-        "prices": [str(r["price"]) for r in rows],
-    })
+    rows = PriceHistory.objects.filter(currency_pair=pair).order_by("timestamp").values("timestamp", "price")[:500]
+    return JsonResponse(
+        {
+            "symbol": symbol,
+            "timestamps": [r["timestamp"].isoformat() for r in rows],
+            "prices": [str(r["price"]) for r in rows],
+        }
+    )
 
 
 def update_prices_api(request):

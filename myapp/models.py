@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-import requests  # ✅ For live prices
+import requests 
 
 
 class Profile(models.Model):
@@ -15,7 +15,7 @@ class Profile(models.Model):
         return f"{self.user.username} Profile - Balance: {self.balance}"
 
 
-# Auto-create profile with starting balance on signup
+
 @receiver(post_save, sender=User)
 def create_profile(sender, instance, created, **kwargs):
     if created:
@@ -42,7 +42,7 @@ class Currency(models.Model):
             self.current_price = new_price
             self.save()
 
-            # Save in history
+            
             PriceHistory.objects.create(currency_pair=self, price=new_price)
             return new_price
         except Exception as e:
@@ -80,7 +80,7 @@ class Trade(models.Model):
         """Executes a trade (buy/sell) with balance and holding checks."""
         amount = Decimal(amount)
 
-        # ✅ Always refresh price before trade
+       
         price = currency.update_price()
         cost = amount * price
 
@@ -104,7 +104,7 @@ class Trade(models.Model):
                 profile.save()
                 holding.save()
 
-            # Save trade record
+        
             return cls.objects.create(
                 user=user,
                 currency_pair=currency,
